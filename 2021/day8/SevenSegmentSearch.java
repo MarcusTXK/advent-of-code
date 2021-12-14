@@ -1,6 +1,11 @@
 package day8;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import util.ReaderUtil;
 
@@ -8,6 +13,7 @@ public class SevenSegmentSearch {
     public static void main(String[] args) {
         List<String> inputs = ReaderUtil.getInputsStr("2021/day8/input.txt");
         System.out.println(partialDigitCounter(inputs));
+        System.out.println(fullDigitCounter(inputs));
     }
 
     /**
@@ -84,13 +90,13 @@ public class SevenSegmentSearch {
         for (int i = 0; i < inputs.size(); i++) {
             String[] digits = inputs.get(i).split("\\|")[1].trim().split(" ");
             for (String digit : digits) {
-                count = digitDecoder(digit) != -1 ? count + 1 : count;
+                count = paritalDigitDecoder(digit) != -1 ? count + 1 : count;
             }
         }
         return count;
     }
 
-    public static int digitDecoder(String value) {
+    public static int paritalDigitDecoder(String value) {
         switch (value.length()) {
         case 2:
             return 1;
@@ -103,5 +109,148 @@ public class SevenSegmentSearch {
         default:
             return -1;
         }
+    }
+
+    /**
+     * --- Part Two ---
+     * Through a little deduction, you should now be able to determine the remaining digits. Consider again the first example above:
+     * <p>
+     * acedgfb cdfbe gcdfa fbcad dab cefabd cdfgeb eafb cagedb ab |
+     * cdfeb fcadb cdfeb cdbaf
+     * After some careful analysis, the mapping between signal wires and segments only make sense in the following configuration:
+     * <p>
+     * dddd
+     * e    a
+     * e    a
+     * ffff
+     * g    b
+     * g    b
+     * cccc
+     * So, the unique signal patterns would correspond to the following digits:
+     * <p>
+     * acedgfb: 8
+     * cdfbe: 5
+     * gcdfa: 2
+     * fbcad: 3
+     * dab: 7
+     * cefabd: 9
+     * cdfgeb: 6
+     * eafb: 4
+     * cagedb: 0
+     * ab: 1
+     * Then, the four digits of the output value can be decoded:
+     * <p>
+     * cdfeb: 5
+     * fcadb: 3
+     * cdfeb: 5
+     * cdbaf: 3
+     * Therefore, the output value for this entry is 5353.
+     * <p>
+     * Following this same process for each entry in the second, larger example above, the output value of each entry can be determined:
+     * <p>
+     * fdgacbe cefdb cefbgd gcbe: 8394
+     * fcgedb cgb dgebacf gc: 9781
+     * cg cg fdcagb cbg: 1197
+     * efabcd cedba gadfec cb: 9361
+     * gecf egdcabf bgf bfgea: 4873
+     * gebdcfa ecba ca fadegcb: 8418
+     * cefg dcbef fcge gbcadfe: 4548
+     * ed bcgafe cdgba cbgef: 1625
+     * gbdfcae bgc cg cgb: 8717
+     * fgae cfgab fg bagce: 4315
+     * Adding all of the output values in this larger example produces 61229.
+     * <p>
+     * For each entry, determine all of the wire/segment connections and decode the four-digit output values. What do you get if you add up all of the output values?
+     */
+    public static int fullDigitCounter(List<String> inputs) {
+        int count = 0;
+        for (String input : inputs) {
+            String[] entry = input.split("\\|");
+            Map<Set<Character>, Integer> decoded = signalDecoder(entry[0].trim());
+            String[] digits = entry[1].trim().split(" ");
+            int number = 0;
+            for (String digit : digits) {
+                number = number * 10 + decoded.get(stringToSet(digit));
+            }
+            count += number;
+        }
+        return count;
+    }
+
+    public static Map<Set<Character>, Integer> signalDecoder(String signal) {
+        HashMap<Set<Character>, Integer> setToDigit = new HashMap<>();
+        HashMap<Integer, Set<Character>> digitToSet = new HashMap<>(); // need 1 and 4 to differentiate others later
+        String[] numbers = signal.split(" ");
+        // Decode digits in this order 1,4,5,7 (obvious ones with unique segment numbers)
+        // 2,3,5 (requires 5 segment)
+        List<Set<Character>> fiveSegments = new ArrayList<>();
+        // 9,6,0 (requires 6 segments)
+        List<Set<Character>> sixSegments = new ArrayList<>();
+        for (String number : numbers) {
+            switch (number.length()) {
+            case 2:
+                setToDigit.put(stringToSet(number), 1);
+                digitToSet.put(1, stringToSet(number));
+                break;
+            case 3:
+                setToDigit.put(stringToSet(number), 7);
+                break;
+            case 4:
+                setToDigit.put(stringToSet(number), 4);
+                digitToSet.put(4, stringToSet(number));
+                break;
+            case 5:
+                fiveSegments.add(stringToSet(number));
+                break;
+            case 6:
+                sixSegments.add(stringToSet(number));
+                break;
+            case 7:
+                setToDigit.put(stringToSet(number), 8);
+                break;
+            }
+        }
+
+        // Differentiate between five segments
+        // 3 -> contains 1
+        // 5 -> only 2 segments left after removing 4
+        // 2 -> only 3 segments left after removing 4
+        for (Set<Character> fiveSegment : fiveSegments) {
+            if (fiveSegment.containsAll(digitToSet.get(1))) {
+                setToDigit.put(fiveSegment, 3);
+            } else {
+                Set<Character> copy = new HashSet<>(fiveSegment);
+                copy.removeAll(digitToSet.get(4));
+                if (copy.size() == 2) {
+                    setToDigit.put(fiveSegment, 5);
+                } else {
+                    setToDigit.put(fiveSegment, 2);
+                }
+            }
+        }
+
+        // Differentiate between six segments
+        // 9 -> contains 4
+        // 0 -> contains 1 but not 4
+        // 6 -> contains neither 1 or 4
+        for (Set<Character> sixSegment : sixSegments) {
+            if (sixSegment.containsAll(digitToSet.get(4))) {
+                setToDigit.put(sixSegment, 9);
+            } else if (!sixSegment.containsAll(digitToSet.get(4)) && sixSegment.containsAll(digitToSet.get(1))) {
+                setToDigit.put(sixSegment, 0);
+            } else {
+                setToDigit.put(sixSegment, 6);
+            }
+        }
+
+        return setToDigit;
+    }
+
+    public static Set<Character> stringToSet(String str) {
+        HashSet<Character> set = new HashSet<>();
+        for (char c : str.toCharArray()) {
+            set.add(c);
+        }
+        return set;
     }
 }
