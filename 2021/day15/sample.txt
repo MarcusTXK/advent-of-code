@@ -1,0 +1,1 @@
+List<String> inputs = ReaderUtil.getInputsStr("2021/day14/input.txt");
